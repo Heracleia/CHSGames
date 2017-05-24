@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class MatchingManager : MonoBehaviour {
 
@@ -8,8 +9,10 @@ public class MatchingManager : MonoBehaviour {
     public Transform matchFrom;
     public GameObject[] shapes;
     public Color[] colors;
+    public Image starPowerImage;
 
     List<GameObject> currentSet;
+    float starPower;
     bool active;
 
     private void Start() {
@@ -19,7 +22,11 @@ public class MatchingManager : MonoBehaviour {
 
     private void Update() {
         if (Input.GetKeyDown(KeyCode.Space))
-            CreateSet();
+            UnityEngine.SceneManagement.SceneManager.LoadScene(0);
+    }
+
+    private void OnGUI() {
+        starPowerImage.fillAmount = starPower;
     }
 
     //Create the set of shapes
@@ -93,7 +100,7 @@ public class MatchingManager : MonoBehaviour {
 
     void IncorrectClick(GameObject sender) {
         if (!active) return;
-        Debug.Log("Incorrect");
+        StartCoroutine(IncorrectSequence(sender));
     }
 
     void ShapeHoverEnter(GameObject sender) {
@@ -115,5 +122,40 @@ public class MatchingManager : MonoBehaviour {
             sender.transform.localPosition = Vector3.MoveTowards(sender.transform.localPosition, target, 0.25f);
             yield return new WaitForSeconds(.01f);
         }
+        yield return new WaitForSeconds(0.5f);
+        foreach (GameObject obj in currentSet) {
+            foreach (ParticleSystem particle in obj.GetComponentsInChildren<ParticleSystem>()) {
+                particle.Emit(50);
+                particle.Stop();
+            }
+        }
+        float targetStarPower = Mathf.Clamp01(starPower + 0.1f);
+        while(starPower < targetStarPower) {
+            starPower += 0.001f;
+            yield return new WaitForSeconds(0.01f);
+        }
+        yield return new WaitForSeconds(1f);
+        if (starPower >= 1) {
+
+        }
+        else {
+            CreateSet();
+        }
+    }
+
+    IEnumerator IncorrectSequence(GameObject sender) {
+        active = false;
+        float targetStarPower = Mathf.Clamp01(starPower - .05f);
+        foreach (GameObject obj in currentSet) {
+            foreach (ParticleSystem particle in obj.GetComponentsInChildren<ParticleSystem>()) {
+                particle.Stop();
+            }
+        }
+        while (starPower > targetStarPower) {
+            starPower -= 0.001f;
+            yield return new WaitForSeconds(0.01f);
+        }
+        yield return new WaitForSeconds(1f);
+        CreateSet();
     }
 }
