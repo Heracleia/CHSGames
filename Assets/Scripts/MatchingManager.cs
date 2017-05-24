@@ -10,6 +10,7 @@ public class MatchingManager : MonoBehaviour {
     public GameObject[] shapes;
     public Color[] colors;
     public Image starPowerImage;
+    public CanvasGroup helpText;
 
     List<GameObject> currentSet;
     float starPower;
@@ -31,7 +32,9 @@ public class MatchingManager : MonoBehaviour {
 
     //Create the set of shapes
     void CreateSet() {
-        while(currentSet.Count > 0) {
+        StartCoroutine(FadeHelpText(1));
+
+        while (currentSet.Count > 0) {
             GameObject temp = currentSet[0];
             currentSet.Remove(temp);
             Destroy(temp);
@@ -62,11 +65,13 @@ public class MatchingManager : MonoBehaviour {
         float correctX = 4f * rng.Next(0, 2) - 4f;
         for(float x = -4f; x <= 4f; x += 4f) {
             if (x == correctX) {
-                GameObject temp = Instantiate(correctShape, matchFrom);
+                int matchWhich = rng.Next(0, 1);
+                GameObject temp = Instantiate(matchWhich == 0 ? correctShape : shapes[rng.Next(tempShapes.Count)], matchFrom);
                 temp.transform.localPosition += Vector3.right * x;
+                Color color = matchWhich == 1 ? correctColor : colors[rng.Next(tempColors.Count)];
                 foreach (ParticleSystem particle in temp.GetComponentsInChildren<ParticleSystem>()) {
                     ParticleSystem.MainModule main = particle.main;
-                    main.startColor = correctColor;
+                    main.startColor = color;
                 }
                 GameShape gameShape = temp.GetComponent<GameShape>();
                 gameShape.OnClicked += CorrectClick;
@@ -116,6 +121,7 @@ public class MatchingManager : MonoBehaviour {
 
     IEnumerator CorrectSequence(GameObject sender) {
         active = false;
+        StartCoroutine(FadeHelpText(0));
         sender.transform.parent = matchTo;
         Vector2 target = new Vector2(6, 0);
         while((Vector2)sender.transform.localPosition != target) {
@@ -145,6 +151,7 @@ public class MatchingManager : MonoBehaviour {
 
     IEnumerator IncorrectSequence(GameObject sender) {
         active = false;
+        StartCoroutine(FadeHelpText(0));
         float targetStarPower = Mathf.Clamp01(starPower - .05f);
         foreach (GameObject obj in currentSet) {
             foreach (ParticleSystem particle in obj.GetComponentsInChildren<ParticleSystem>()) {
@@ -157,5 +164,16 @@ public class MatchingManager : MonoBehaviour {
         }
         yield return new WaitForSeconds(1f);
         CreateSet();
+    }
+
+    IEnumerator FadeHelpText(float alpha) {
+        while(helpText.alpha < alpha) {
+            helpText.alpha += .01f;
+            yield return new WaitForSeconds(.01f);
+        }
+        while(helpText.alpha > alpha) {
+            helpText.alpha -= .01f;
+            yield return new WaitForSeconds(.01f);
+        }
     }
 }
