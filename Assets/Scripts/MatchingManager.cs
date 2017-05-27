@@ -11,28 +11,63 @@ public class MatchingManager : MonoBehaviour {
     public Color[] colors;
     public Image starPowerImage;
     public CanvasGroup helpText;
+    public AudioClip successSound;
+    public AudioClip failSound;
+    public AudioClip finishSound;
+    public CanvasGroup finishCanvas;
+    public Text scoreText;
+    public Text finishTitle;
+    public Text timerText;
+    public GameObject markCheck;
+    public GameObject markX;
+    public float maxTime = 7.5f;
 
+    AudioSource audioSource;
     List<GameObject> currentSet;
+    List<GameObject> marks;
     float starPower;
+    float score;
+    float timer;
     bool active;
 
     private void Start() {
+        audioSource = GetComponent<AudioSource>();
         currentSet = new List<GameObject>();
+        marks = new List<GameObject>();
         CreateSet();
-    }
-
-    private void Update() {
-        if (Input.GetKeyDown(KeyCode.Space))
-            UnityEngine.SceneManagement.SceneManager.LoadScene(0);
     }
 
     private void OnGUI() {
         starPowerImage.fillAmount = starPower;
+        scoreText.text = "Score: " + Mathf.RoundToInt(score);
+        timerText.text = timer.ToString("f1");
+    }
+
+    private void Update() {
+        if (active) {
+            timer = Mathf.Max(0, timer - Time.deltaTime);
+            if (timer == 0) {
+                StartCoroutine(IncorrectSequence(null));
+            }
+        }
+
+        if(Input.GetKeyDown(KeyCode.Escape)) {
+            if (Time.timeScale == 1) {
+                finishCanvas.gameObject.SetActive(true);
+                finishCanvas.alpha = 1;
+                Time.timeScale = 0;
+                finishTitle.text = "Paused";
+            } else {
+                finishCanvas.gameObject.SetActive(false);
+                finishCanvas.alpha = 0;
+                Time.timeScale = 1;
+            }
+        }
     }
 
     //Create the set of shapes
     void CreateSet() {
-        StartCoroutine(FadeHelpText(1));
+        timer = maxTime;
 
         while (currentSet.Count > 0) {
             GameObject temp = currentSet[0];
@@ -78,6 +113,11 @@ public class MatchingManager : MonoBehaviour {
                 gameShape.OnHoverEnter += ShapeHoverEnter;
                 gameShape.OnHoverExit += ShapeHoverExit;
                 currentSet.Add(temp);
+
+                GameObject mark = Instantiate(markCheck);
+                mark.transform.position = gameShape.transform.position + new Vector3(-1, 1, 0);
+                mark.SetActive(false);
+                marks.Add(mark);
             }
             else {
                 GameObject temp = Instantiate(tempShapes[rng.Next(tempShapes.Count)], matchFrom);
@@ -92,6 +132,11 @@ public class MatchingManager : MonoBehaviour {
                 gameShape.OnHoverEnter += ShapeHoverEnter;
                 gameShape.OnHoverExit += ShapeHoverExit;
                 currentSet.Add(temp);
+
+                GameObject mark = Instantiate(markX);
+                mark.transform.position = gameShape.transform.position + new Vector3(-1, 1, 0);
+                mark.SetActive(false);
+                marks.Add(mark);
             }
         }
 
@@ -109,10 +154,10 @@ public class MatchingManager : MonoBehaviour {
     }
 
     void ShapeHoverEnter(GameObject sender) {
-        if (!active) return;
+        /*if (!active) return;
         foreach(ParticleSystem particle in sender.GetComponentsInChildren<ParticleSystem>()) {
             particle.Emit((int)particle.emission.rateOverTimeMultiplier * 2);
-        }
+        }*/
     }
 
     void ShapeHoverExit(GameObject sender) {
@@ -121,9 +166,15 @@ public class MatchingManager : MonoBehaviour {
 
     IEnumerator CorrectSequence(GameObject sender) {
         active = false;
-        StartCoroutine(FadeHelpText(0));
+        audioSource.clip = successSound;
+        audioSource.Play();
+        helpText.alpha = 0;
+        score += 100 + timer * 50;
         sender.transform.parent = matchTo;
         Vector2 target = new Vector2(6, 0);
+        foreach(GameObject mark in marks) {
+            mark.SetActive(true);
+        }
         while((Vector2)sender.transform.localPosition != target) {
             sender.transform.localPosition = Vector3.MoveTowards(sender.transform.localPosition, target, 0.25f);
             yield return new WaitForSeconds(.01f);
@@ -135,6 +186,11 @@ public class MatchingManager : MonoBehaviour {
                 particle.Stop();
             }
         }
+        while(marks.Count > 0) {
+            GameObject mark = marks[0];
+            marks.Remove(mark);
+            Destroy(mark);
+        }
         float targetStarPower = Mathf.Clamp01(starPower + 0.1f);
         while(starPower < targetStarPower) {
             starPower += 0.001f;
@@ -142,7 +198,7 @@ public class MatchingManager : MonoBehaviour {
         }
         yield return new WaitForSeconds(1f);
         if (starPower >= 1) {
-
+            StartCoroutine(FinishSequence());
         }
         else {
             CreateSet();
@@ -151,7 +207,12 @@ public class MatchingManager : MonoBehaviour {
 
     IEnumerator IncorrectSequence(GameObject sender) {
         active = false;
-        StartCoroutine(FadeHelpText(0));
+        audioSource.clip = failSound;
+        audioSource.Play();
+        foreach (GameObject mark in marks) {
+            mark.SetActive(true);
+        }
+        score = Mathf.Max(0, score - (maxTime - timer));
         float targetStarPower = Mathf.Clamp01(starPower - .05f);
         foreach (GameObject obj in currentSet) {
             foreach (ParticleSystem particle in obj.GetComponentsInChildren<ParticleSystem>()) {
@@ -163,17 +224,23 @@ public class MatchingManager : MonoBehaviour {
             yield return new WaitForSeconds(0.01f);
         }
         yield return new WaitForSeconds(1f);
+        while (marks.Count > 0) {
+            GameObject mark = marks[0];
+            marks.Remove(mark);
+            Destroy(mark);
+        }
         CreateSet();
     }
 
-    IEnumerator FadeHelpText(float alpha) {
-        while(helpText.alpha < alpha) {
-            helpText.alpha += .01f;
-            yield return new WaitForSeconds(.01f);
-        }
-        while(helpText.alpha > alpha) {
-            helpText.alpha -= .01f;
-            yield return new WaitForSeconds(.01f);
+    IEnumerator FinishSequence() {
+        audioSource.clip = finishSound;
+        audioSource.Play();
+        finishCanvas.gameObject.SetActive(true);
+        scoreText.gameObject.SetActive(true);
+        finishTitle.text = "Good Job!";
+        while(finishCanvas.alpha < 1) {
+            finishCanvas.alpha += .01f;
+            yield return new WaitForSeconds(.001f);
         }
     }
 }
