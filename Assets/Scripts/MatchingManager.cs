@@ -100,7 +100,7 @@ public class MatchingManager : MonoBehaviour {
         float correctX = 4f * rng.Next(0, 2) - 4f;
         for(float x = -4f; x <= 4f; x += 4f) {
             if (x == correctX) {
-                int matchWhich = rng.Next(0, 1);
+                int matchWhich = rng.Next(0, 2);
                 GameObject temp = Instantiate(matchWhich == 0 ? correctShape : shapes[rng.Next(tempShapes.Count)], matchFrom);
                 temp.transform.localPosition += Vector3.right * x;
                 Color color = matchWhich == 1 ? correctColor : colors[rng.Next(tempColors.Count)];
